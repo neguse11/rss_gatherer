@@ -20,6 +20,7 @@ var sourcesObj = JSON.parse(fs.readFileSync(sourcesJsonFilename, "utf8"));
 var sources = sourcesObj[0].sources;
 var now = new Date();
 var outputDir = "output";
+var tzOffset = -9;
 
 (function() {
     var profileError = false;
@@ -47,7 +48,9 @@ function getuploaderHtmlToEntries(url, html) {
     var $ = cheerio.load(html);
     var dateTimeConverter = function(str) {
         var ds = str.split(/\s|\:|\//);
-        return new Date(parseInt(ds[0])+2000, ds[1]-1, ds[2], ds[3], ds[4]);
+        var d = new Date(Date.UTC(parseInt(ds[0])+2000, ds[1]-1, ds[2], ds[3], ds[4]));
+        d.setTime(d.getTime() + tzOffset * 60 * 60 * 1000);
+        return d;
     };
 
     // トップページは div.table-wrapper tbody
