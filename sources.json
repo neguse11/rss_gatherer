@@ -1,0 +1,24 @@
+[{
+	"sources" : [
+		{
+			  "url"      : "http://ux.getuploader.com/CM3D/"
+			, "title"    : "CM3D 紳士の嫁貼りろーだ（仮）"
+			, "filename" : "cm3d.rss"
+		}
+		, {
+			  "url"      : "http://ux.getuploader.com/cm3d2/"
+			, "title"    : "CM3D2 MOD ろだA"
+			, "filename" : "cm3d2.rss"
+		}
+		, {
+			  "url"      : "http://ux.getuploader.com/cm3d2_b/"
+			, "title"    : "CM3D2 MOD ろだB"
+			, "filename" : "cm3d2_b.rss"
+		}
+		, {
+			  "url"      : "http://ux.getuploader.com/cm3d2_c/"
+			, "title"    : "CM3D2 MOD ろだC"
+			, "filename" : "cm3d2_c.rss"
+		}
+	]
+}]

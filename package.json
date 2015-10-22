@@ -1,0 +1,15 @@
+{
+  "name"         : "node-getuploader-scraper",
+  "version"      : "0.0.1",
+  "description"  : "",
+  "author"       : "",
+  "private"      : true,
+  "dependencies" : {
+    "async"      : "latest",
+    "rimraf"     : "latest",
+    "simple-git" : "latest",
+    "rss"        : "latest",
+    "request"    : "latest",
+    "cheerio"    : "latest"
+  }
+}
