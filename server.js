@@ -1,26 +1,36 @@
-﻿var request = require('request')
-  , fs      = require('fs')
-  , cheerio = require('cheerio')
-  , async   = require('async')
-  , RSS     = require('rss')
-  , rmdir   = require('rimraf')
+﻿var request  = require('request')
+  , fs       = require('fs')
+  , cheerio  = require('cheerio')
+  , async    = require('async')
+  , RSS      = require('rss')
+  , rmdir    = require('rimraf')
+  , mkdirp   = require('mkdirp')
+  , moment   = require('moment')
   ;
+
+// Auto load .env file
+if(process.argv.indexOf("--load-dot-env") > -1) {
+    require('dotenv').load();
+}
 
 var gitProfile = {
       email        : process.env.GH_EMAIL  || "nobody@example.com"
     , name         : process.env.GH_NAME   || "nobody"
     , githubUser   : process.env.GH_USER   || null      // github user name
-    , githubPass   : process.env.GH_PASS   || null      // github password
+    , githubPass   : process.env.GH_PASS   || null      // github OAuth token
     , githubRepo   : process.env.GH_REPO   || null      // github repository URL (https://github.com/USER/REPO.git)
     , githubBranch : process.env.GH_BRANCH || "gh-pages"
 };
+
+var scrapers = {
+      "ux.getuploader.com"      : getuploaderScraper
+}
 
 var sourcesJsonFilename = process.env.SOURCES || "sources.json";
 var sourcesObj = JSON.parse(fs.readFileSync(sourcesJsonFilename, "utf8"));
 var sources = sourcesObj[0].sources;
 var now = new Date();
-var outputDir = "output";
-var tzOffset = -9;
+var outputDir = process.env.OUTPUT || "output";
 
 (function() {
     var profileError = false;
@@ -42,14 +52,14 @@ var tzOffset = -9;
     }
 })();
 
-function getuploaderHtmlToEntries(url, html) {
+function getuploaderHtmlToEntries(url, html, timeZoneOffsetInMilliSeconds) {
     var nextPage = null;
     var entries = [];
     var $ = cheerio.load(html);
     var dateTimeConverter = function(str) {
         var ds = str.split(/\s|\:|\//);
         var d = new Date(Date.UTC(parseInt(ds[0])+2000, ds[1]-1, ds[2], ds[3], ds[4]));
-        d.setTime(d.getTime() + tzOffset * 60 * 60 * 1000);
+        d.setTime(d.getTime() + timeZoneOffsetInMilliSeconds);
         return d;
     };
 
@@ -95,60 +105,39 @@ function getuploaderHtmlToEntries(url, html) {
     };
 }
 
-function getuploaderScraper(result, url) {
+function getuploaderScraper(result, url, cb) {
+    if(! result.hasOwnProperty("entries")) {
+        result.entries = [];
+    }
+
     request(url, function(error, response, html) {
-        var r = getuploaderHtmlToEntries(url, html);
+        var r = getuploaderHtmlToEntries(url, html, result.timeZoneOffsetInMilliSeconds);
         result.entries = result.entries.concat(r.entries);
-        if(r.nextPage == null) {
-            result.callback(result);
+        if(r.nextPage != null) {
+            getuploaderScraper(result, r.nextPage, cb);
             return;
         }
-        getuploaderScraper(result, r.nextPage);
+        getuploaderMakeFeed(result, cb);
     });
 }
 
 function getuploaderMakeFeed(result, cb) {
-    var feed = new RSS(result.feedOptions);
     for(var i = 0; i < result.entries.length; i++) {
         var e = result.entries[i];
-        feed.item({
+        result.feed.item({
               title         : e.filename + "(" + e.original + ")"
             , description   : e.comment + "(" + e.filesize + ")"
             , url           : e.url
             , date          : e.date
         });
     }
-    var xml = feed.xml();
-    fs.writeFile(
-          result.output_feedname
-        , xml
-        , function(err) {
-            if(err) { return console.log(err); }
-            console.log("Feed " + result.output_feedname + " successfuly written");
-            cb();
-        }
-    );
+    cb(result);
 }
 
-// http://stackoverflow.com/a/21196961/2132223
-function mkdir(path, mask, cb) {
-    if (typeof mask == 'function') { // allow the `mask` parameter to be optional
-        cb = mask;
-        mask = 0777;
-    }
-    fs.mkdir(path, mask, function(err) {
-        if (err && err.code != 'EEXIST') {
-            cb(err);
-        } else {
-            cb(null);
-        }
-    });
-}
-
-function mkEmptyDir(path, mask, cb) {
+function mkEmptyDir(path, cb) {
     rmdir(path, function(err) {
         if(err) { return console.log(err); }
-        mkdir(path, mask, cb);
+        mkdirp(path, cb);
     });
 }
 
@@ -167,16 +156,38 @@ function main() {
                     feedOptions.pubDate  = new Date();
                     var result = {
                           url             : source.url
-                        , output_feedname : outputDir + "/" + source.filename
-                        , feedOptions     : feedOptions
-                        , entries         : []
-                        , callback        : function(that) {
-                            getuploaderMakeFeed(that, function() {
-                                asyncCallback();
-                            });
-                        }
+                        , outputFileName  : outputDir + "/" + source.filename
+                        , feed            : new RSS(feedOptions)
+                        , timeZoneOffsetInMilliSeconds  : moment.duration(0).asMilliseconds()
                     };
-                    getuploaderScraper(result, result.url);
+                    if(source.hasOwnProperty("timezone")) {
+                        result.timeZoneOffsetInMilliSeconds = -moment.duration(source.timezone).asMilliseconds();
+                    }
+
+                    var scraper = undefined;
+                    if(source.hasOwnProperty("type")) {
+                        scraper = scrapers[source.type];
+                    }
+
+                    if(! scraper) {
+                        asyncCallback();
+                    } else {
+                        scraper(
+                            result,
+                            result.url,
+                            function(result) {
+                                fs.writeFile(
+                                      result.outputFileName
+                                    , result.feed.xml()
+                                    , function(err) {
+                                        if(err) { return console.log(err); }
+                                        console.log("Feed " + result.outputFileName + " successfuly written");
+                                        asyncCallback();
+                                    }
+                                );
+                            }
+                        );
+                    }
                 } catch(e) {
                     return asyncCallback(e);
                 }
