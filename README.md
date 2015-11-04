@@ -129,8 +129,8 @@ heroku logs --ps scheduler
 
 `.env` には基本的な情報を入れます。**このファイルを公開しないように気をつけてください**
 
-| 項目名             | 内容 | 例 |
-| ----               | ---- | -- |
+| 項目名             | 内容 | 例   |
+| ----               | ---- | ---- |
 |GH_USER             |GitHub上のユーザー名 | `HOGE` |
 |GH_PASS             |GitHubで取得した [OAuth トークン](https://help.github.com/articles/git-automation-with-oauth-tokens/) (40 文字の 16進数) | `0123456789abcdef0123456789abcdef01234567` |
 |GH_REPO             |GitHub上のリポジトリ URL | `https://github.com/HOGE/FUGA.git` |
@@ -140,8 +140,8 @@ heroku logs --ps scheduler
 
 `.env` ではオプション機能として、Mailgun からの送信設定を指定することができます
 
-| 項目名             | 内容 | 例 |
-| ----               | ---- | -- |
+| 項目名             | 内容 | 例   |
+| ----               | ---- | ---- |
 |MAILGUN_API_BASEURL |MailgunのAPIのURL | `https://api.mailgun.net/v3/sandboxXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.mailgun.org` |
 |MAILGUN_API_KEY     |MailgunのAPIキー  | `key-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
 |MAILGUN_TO          |Mailgunからのレポートの送信先 | `my.mail@example.com` |
