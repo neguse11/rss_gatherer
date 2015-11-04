@@ -87,6 +87,7 @@ Heroku へログインし、コードと設定を push して、Heroku のサー
 heroku login
 heroku create
 heroku ps:scale web=0
+heroku plugins:install git://github.com/ddollar/heroku-config.git
 git config user.email "HOGE"
 git config user.name "HOGE"
 ```
@@ -98,7 +99,6 @@ heroku login
 git add .
 git commit -m "push to heroku"
 git push heroku master
-heroku plugins:install git://github.com/ddollar/heroku-config.git
 heroku config:push
 heroku run bot
 ```
@@ -129,14 +129,23 @@ heroku logs --ps scheduler
 
 `.env` には基本的な情報を入れます。**このファイルを公開しないように気をつけてください**
 
-| 項目名   | 内容 |
-| ----     | ---- |
-|GH_USER   |GitHub上のユーザー名 (`HOGE` など)
-|GH_PASS   |GitHubで取得した OAuth トークン (`0123456789abcdef0123456789abcdef01234567` などの 40 文字の 16進数)
-|GH_REPO   |GitHub上のリポジトリ URL (`https://https://github.com/HOGE/FUGA.git` など)
-|GH_EMAIL  |GitHub上のリポジトリ内のコミットログに表示するメールアドレス |
-|GH_NAME   |GitHub上のリポジトリ内のコミットログに表示する名前 |
-|GH_BRANCH |GitHub上のリポジトリ内のコミット先 |
+| 項目名             | 内容 | 例 |
+| ----               | ---- | -- |
+|GH_USER             |GitHub上のユーザー名 | `HOGE` |
+|GH_PASS             |GitHubで取得した [OAuth トークン](https://help.github.com/articles/git-automation-with-oauth-tokens/) (40 文字の 16進数) | `0123456789abcdef0123456789abcdef01234567` |
+|GH_REPO             |GitHub上のリポジトリ URL | `https://github.com/HOGE/FUGA.git` |
+|GH_EMAIL            |GitHub上のリポジトリ内のコミットログに表示するメールアドレス | [`HOGE@users.noreply.github.com`](https://help.github.com/articles/keeping-your-email-address-private/)) |
+|GH_NAME             |GitHub上のリポジトリ内のコミットログに表示する名前 | `HOGE` |
+|GH_BRANCH           |GitHub上のリポジトリ内のコミット先ブランチ名 | `gh-pages` |
+
+`.env` ではオプション機能として、Mailgun からの送信設定を指定することができます
+
+| 項目名             | 内容 | 例 |
+| ----               | ---- | -- |
+|MAILGUN_API_BASEURL |MailgunのAPIのURL | `https://api.mailgun.net/v3/sandboxXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX.mailgun.org` |
+|MAILGUN_API_KEY     |MailgunのAPIキー  | `key-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX`
+|MAILGUN_TO          |Mailgunからのレポートの送信先 | `my.mail@example.com` |
+|MAILGUN_FROM        |Mailgunへレポートを送信する際の From: 欄の値 | `rss_gathrer@report.example.com` |
 
 `sources.json` は巡回先の URL 等を指定するファイルです `"sources"` 下の項目を増減させることで、巡回先を設定できます
 
@@ -156,6 +165,11 @@ heroku logs --ps scheduler
 ```
 npm run herokish
 ```
+
+
+## うまく動かない場合
+
+- [トラブルと解消方法](TROUBLES.md)
 
 
 ## ライセンス

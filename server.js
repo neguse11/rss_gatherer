@@ -8,6 +8,37 @@
   , moment   = require('moment')
   ;
 
+process.stdout.write = (function() {
+    var fn = function(string, encoding, fd) {
+        if(fn.enabled) {
+            fn.logs.push(string);
+        }
+        if(fn.oldStdoutWrite) {
+            fn.oldStdoutWrite.apply(this, arguments);
+        }
+    };
+
+    fn.logs = [];
+    fn.enabled = true;
+    fn.oldStdoutWrite = process.stdout.write;
+
+    fn.clear = function() {
+        fn.logs = [];
+    };
+
+    fn.enable = function(enabled) {
+        fn.enabled = enabled;
+    };
+
+    fn.unhook = function() {
+        if(fn.oldStdoutWrite) {
+            process.stdout.write = fn.oldStdoutWrite;
+            fn.oldStdoutWrite = null;
+        }
+    };
+    return fn;
+})();
+
 // Auto load .env file
 if(process.argv.indexOf("--load-dot-env") > -1) {
     require('dotenv').load();
@@ -35,14 +66,16 @@ var outputDir = process.env.OUTPUT || "output";
 (function() {
     var profileError = false;
 
-    if(!gitProfile.githubUser) { profileError = true; console.log("ERROR : Environment variable GH_USER is not specified"); }
-    if(!gitProfile.githubPass) { profileError = true; console.log("ERROR : Environment variable GH_PASS is not specified"); }
-    if(!gitProfile.githubRepo) { profileError = true; console.log("ERROR : Environment variable GH_REPO is not specified"); }
-    (function() {
-        var ss = gitProfile.githubRepo.split("//");
-        var remoteUrl = ss[0] + "//" + gitProfile.githubUser + ":" + gitProfile.githubPass + "@" + ss[1];
-        gitProfile.githubRemoteUrl = remoteUrl;
-    })();
+    if(! process.env.GH_DONT_PUSH) {
+        if(!gitProfile.githubUser) { profileError = true; console.log("ERROR : Environment variable GH_USER is not specified"); }
+        if(!gitProfile.githubPass) { profileError = true; console.log("ERROR : Environment variable GH_PASS is not specified"); }
+        if(!gitProfile.githubRepo) { profileError = true; console.log("ERROR : Environment variable GH_REPO is not specified"); }
+        (function() {
+            var ss = gitProfile.githubRepo.split("//");
+            var remoteUrl = ss[0] + "//" + gitProfile.githubUser + ":" + gitProfile.githubPass + "@" + ss[1];
+            gitProfile.githubRemoteUrl = remoteUrl;
+        })();
+    }
 
     var sourcesError = false;
     if(!sourcesObj || !sources) { sourcesError = true; console.log("ERROR : sources.json is invalid"); }
@@ -51,6 +84,47 @@ var outputDir = process.env.OUTPUT || "output";
         process.exit(1);
     }
 })();
+
+var mailgun = function(text, cb) {
+    var base = process.env.MAILGUN_API_BASEURL;
+    var key  = process.env.MAILGUN_API_KEY;
+    var from = process.env.MAILGUN_FROM || "mailgun@example.com";
+    var to   = process.env.MAILGUN_TO;
+    var subject = process.env.MAILGUN_SUBJECT || "mailgun @ ";
+    if(base && key && from && to && subject && text) {
+        var mailgunOpts = {
+            url: base + "/messages"
+            , headers: {
+                Authorization: "Basic " + new Buffer("api:" + key).toString("base64")
+            }
+            , form: {
+                  from    : from
+                , to      : to
+                , subject : subject + new Date()
+                , text    : text
+            }
+        }
+        request.post(mailgunOpts, function(err, response, body) {
+            if(cb) {
+                cb(err, body);
+            } else {
+                console.log("mailgun: " + JSON.stringify(err || body, null, 2));
+            }
+        });
+    } else {
+        var msg = "the following environment variables are not set properly: ";
+        if(!base) {
+            msg += " MAILGUN_API_BASEURL";
+        }
+        if(!key) {
+            msg += " MAILGUN_API_KEY";
+        }
+        if(!to) {
+            msg += " MAILGUN_TO";
+        }
+        cb(null, { message: msg });
+    }
+};
 
 function getuploaderHtmlToEntries(url, html, timeZoneOffsetInMilliSeconds) {
     var nextPage = null;
@@ -68,21 +142,23 @@ function getuploaderHtmlToEntries(url, html, timeZoneOffsetInMilliSeconds) {
     $("div.table-wrapper tbody, div.table-responsive tbody").filter(function() {
         $(this).find("tr").each(function(trIndex) {
             var entry = {
-                  filename : ""
-                , comment  : ""
-                , original : ""
-                , filesize : ""
-                , date     : new Date()
-                , url      : ""
+                  filename      : ""
+                , comment       : ""
+                , original      : ""
+                , filesize      : ""
+                , date          : new Date()
+                , url           : ""
+                , downloadCount : ""
             };
             $(this).find("td").each(function(tdIndex) {
                 switch(tdIndex) {
                 default: break;
-                case 0: entry.filename = $(this).text(); entry.url = $(this).find("a").attr("href"); break;
-                case 1: entry.comment  = $(this).text(); break;
-                case 2: entry.original = $(this).text(); break;
-                case 3: entry.filesize = $(this).text(); break;
-                case 4: entry.date     = dateTimeConverter($(this).text()); break;
+                case 0: entry.filename      = $(this).text(); entry.url = $(this).find("a").attr("href"); break;
+                case 1: entry.comment       = $(this).text(); break;
+                case 2: entry.original      = $(this).text(); break;
+                case 3: entry.filesize      = $(this).text(); break;
+                case 4: entry.date          = dateTimeConverter($(this).text()); break;
+                case 5: entry.downloadCount = $(this).text(); break;
                 }
             });
             entries.push(entry);
@@ -141,84 +217,120 @@ function mkEmptyDir(path, cb) {
     });
 }
 
-function main() {
-    mkEmptyDir(outputDir, function(err) {
+function init(path, asyncCallback) {
+    console.log("init", path);
+    rmdir(path, function(err) {
         if(err) { return console.log(err); }
-        async.forEachOf(
-            sources
+        mkdirp(path, asyncCallback);
+    });
+}
 
-            // sources の各要素に対して実行される関数
-            , function(source, key, asyncCallback) {
-                try {
-                    var feedOptions = {};
-                    feedOptions.title    = source.title;
-                    feedOptions.site_url = source.url;
-                    feedOptions.pubDate  = new Date();
-                    var result = {
-                          url             : source.url
-                        , outputFileName  : outputDir + "/" + source.filename
-                        , feed            : new RSS(feedOptions)
-                        , timeZoneOffsetInMilliSeconds  : moment.duration(0).asMilliseconds()
-                    };
-                    if(source.hasOwnProperty("timezone")) {
-                        result.timeZoneOffsetInMilliSeconds = -moment.duration(source.timezone).asMilliseconds();
-                    }
+function sourceProcessor(source, key, asyncCallback) {
+    try {
+        var feedOptions = {};
+        feedOptions.title    = source.title;
+        feedOptions.site_url = source.url;
+        feedOptions.pubDate  = new Date();
+        var result = {
+              url             : source.url
+            , outputFileName  : outputDir + "/" + source.filename
+            , feed            : new RSS(feedOptions)
+            , timeZoneOffsetInMilliSeconds  : moment.duration(0).asMilliseconds()
+        };
+        if(source.hasOwnProperty("timezone")) {
+            result.timeZoneOffsetInMilliSeconds = -moment.duration(source.timezone).asMilliseconds();
+        }
 
-                    var scraper = undefined;
-                    if(source.hasOwnProperty("type")) {
-                        scraper = scrapers[source.type];
-                    }
+        var scraper = undefined;
+        if(source.hasOwnProperty("type")) {
+            scraper = scrapers[source.type];
+        }
 
-                    if(! scraper) {
-                        asyncCallback();
-                    } else {
-                        scraper(
-                            result,
-                            result.url,
-                            function(result) {
-                                fs.writeFile(
-                                      result.outputFileName
-                                    , result.feed.xml()
-                                    , function(err) {
-                                        if(err) { return console.log(err); }
-                                        console.log("Feed " + result.outputFileName + " successfuly written");
-                                        asyncCallback();
-                                    }
-                                );
-                            }
-                        );
-                    }
-                } catch(e) {
-                    return asyncCallback(e);
+        if(! scraper) {
+            asyncCallback();
+        } else {
+            scraper(
+                result,
+                result.url,
+                function(result) {
+                    fs.writeFile(
+                          result.outputFileName
+                        , result.feed.xml()
+                        , function(err) {
+                            if(err) { return console.log(err); }
+                            console.log("Feed " + result.outputFileName + " successfuly written");
+                            asyncCallback();
+                        }
+                    );
                 }
-            }
+            );
+        }
+    } catch(e) {
+        return asyncCallback(e);
+    }
+}
 
-            // 全要素の実行が終了したあとに呼ばれる関数
-            , function(err) {
-                if(err) { return console.log(err); }
-                console.log("All tasks are successfully completed");
-                require('simple-git')(outputDir)
-                    .init()
-                    .addRemote("github", gitProfile.githubRemoteUrl)
-                    ._run(['checkout', '--orphan', gitProfile.githubBranch], function(err) {
-                        if(err) { return console.log(err); }
-                    })
-                    ._run(['config', 'user.email', gitProfile.email], function(err) {
-                        if(err) { return console.log(err); }
-                    })
-                    ._run(['config', 'user.name', gitProfile.name], function(err) {
-                        if(err) { return console.log(err); }
-                    })
-                    .add("./*")
-                    .commit("Update @ " + now.toUTCString())
-                    ._run(['push', '--force', "github", gitProfile.githubBranch], function(err) {
-                        if(err) { return console.log(err); }
-                        console.log("git push completed");
-                    })
-                    ;
+function gitPush() {
+    require('simple-git')(outputDir)
+        .init()
+        .addRemote("github", gitProfile.githubRemoteUrl)
+        ._run(['checkout', '--orphan', gitProfile.githubBranch], function(err) {
+            if(err) { return console.log(err); }
+        })
+        ._run(['config', 'user.email', gitProfile.email], function(err) {
+            if(err) { return console.log(err); }
+        })
+        ._run(['config', 'user.name', gitProfile.name], function(err) {
+            if(err) { return console.log(err); }
+        })
+        .add("./*")
+        .commit("Update @ " + now.toUTCString())
+        ._run(['push', '--force', "github", gitProfile.githubBranch], function(err) {
+            if(err) { return console.log(err); }
+            console.log("git push completed");
+    });
+}
+
+function sendMailgun(asyncCallback) {
+    var logs = process.stdout.write.logs;
+    var log = "";
+    logs.forEach(function(line) {
+        log += line;
+    });
+    logs = [];
+    console.log("mailgun : sending...");
+    mailgun(log, function(err, response) {
+        console.log("mailgun: " + JSON.stringify(err || response, null, 4));
+        asyncCallback(null);
+    });
+}
+
+function main() {
+    async.series([
+          function(asyncCallback) {
+            console.log("rss_gathrer : start @ " + new Date().toUTCString());
+            init(outputDir, function(err) {
+                asyncCallback(null);
+            });
+        }
+        , function(asyncCallback) {
+            async.forEachOf(sources, sourceProcessor, asyncCallback)
+        }
+        , function(asyncCallback) {
+            if(process.env.GH_DONT_PUSH) {
+                console.log("SKIP : git push");
+            } else {
+                gitPush();
             }
-        );
-    })
+            asyncCallback(null);
+        }
+        , function(asyncCallback) {
+            console.log("rss_gathrer : finish @ " + new Date().toUTCString());
+            sendMailgun(function(err, response) {
+                asyncCallback(null);
+            });
+        }
+    ]);
 }
 
 main();

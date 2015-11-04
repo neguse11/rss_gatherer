@@ -1,21 +1,21 @@
 {
-  "name"         : "getuploader-scraper",
-  "version"      : "0.0.1",
-  "private"      : true,
-  "scripts"      : {
-    "herokish"   : "node server.js --load-dot-env",
-    "start"      : "node server.js"
+  "name": "getuploader-scraper",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "herokish": "node server.js --load-dot-env",
+    "start": "node server.js"
   },
-  "dependencies" : {
-    "dotenv"     : "latest",
-    "moment"     : "latest",
-    "async"      : "latest",
-    "rimraf"     : "latest",
-    "mkdirp"     : "latest",
-    "simple-git" : "latest",
-    "rss"        : "latest",
-    "request"    : "latest",
-    "cheerio"    : "latest"
+  "dependencies": {
+    "async": "latest",
+    "cheerio": "latest",
+    "dotenv": "latest",
+    "mkdirp": "latest",
+    "moment": "latest",
+    "request": "^2.65.0",
+    "rimraf": "latest",
+    "rss": "latest",
+    "simple-git": "latest"
   },
-  "license"      : "WTFPL"
+  "license": "WTFPL"
 }
