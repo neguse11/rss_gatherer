@@ -99,7 +99,7 @@ heroku login
 git add .
 git commit -m "push to heroku"
 git push heroku master
-heroku config:push
+heroku config:push -o && heroku config
 heroku run bot
 ```
 

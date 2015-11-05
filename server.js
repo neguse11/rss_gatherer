@@ -270,25 +270,26 @@ function sourceProcessor(source, key, asyncCallback) {
     }
 }
 
-function gitPush() {
+function gitPush(callback) {
     require('simple-git')(outputDir)
         .init()
         .addRemote("github", gitProfile.githubRemoteUrl)
         ._run(['checkout', '--orphan', gitProfile.githubBranch], function(err) {
-            if(err) { return console.log(err); }
+			if(err) { console.log(err); callback(err); return; }
         })
         ._run(['config', 'user.email', gitProfile.email], function(err) {
-            if(err) { return console.log(err); }
+            if(err) { console.log(err); callback(err); return; }
         })
         ._run(['config', 'user.name', gitProfile.name], function(err) {
-            if(err) { return console.log(err); }
+            if(err) { console.log(err); callback(err); return; }
         })
         .add("./*")
         .commit("Update @ " + now.toUTCString())
         ._run(['push', '--force', "github", gitProfile.githubBranch], function(err) {
-            if(err) { return console.log(err); }
-            console.log("git push completed");
-    });
+            if(err) { console.log(err); callback(err); return; }
+	        console.log("git push completed");
+			callback(err);
+   	 	});
 }
 
 function sendMailgun(asyncCallback) {
@@ -298,7 +299,7 @@ function sendMailgun(asyncCallback) {
         log += line;
     });
     logs = [];
-    console.log("mailgun : sending...");
+    console.log("mailgun: sending...");
     mailgun(log, function(err, response) {
         console.log("mailgun: " + JSON.stringify(err || response, null, 4));
         asyncCallback(null);
@@ -319,10 +320,12 @@ function main() {
         , function(asyncCallback) {
             if(process.env.GH_DONT_PUSH) {
                 console.log("SKIP : git push");
-            } else {
-                gitPush();
+	            asyncCallback(null);
+				return;
             }
-            asyncCallback(null);
+			gitPush(function(err) {
+				asyncCallback(null);
+			});
         }
         , function(asyncCallback) {
             console.log("rss_gathrer : finish @ " + new Date().toUTCString());
