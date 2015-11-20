@@ -7,8 +7,8 @@
 ```
 > git push heroku master
 
-remote: !       No such app as mighty-plains-XXXX.
-fatal: repository 'https://git.heroku.com/mighty-plains-XXXX.git/' not found
+remote: !       No such app as ABCD-EFGH-XXXX.
+fatal: repository 'https://git.heroku.com/ABCD-EFGH-XXXX.git/' not found
 ```
 
 まず、`git remote -v` で現在のリモートリポジトリの設定を表示します
@@ -16,8 +16,8 @@ fatal: repository 'https://git.heroku.com/mighty-plains-XXXX.git/' not found
 ```
 > git remote -v
 
-heroku  https://git.heroku.com/mighty-plains-XXXX.git (fetch)
-heroku  https://git.heroku.com/mighty-plains-XXXX.git (push)
+heroku  https://git.heroku.com/ABCD-EFGH-XXXX.git (fetch)
+heroku  https://git.heroku.com/ABCD-EFGH-XXXX.git (push)
 ```
 
 これが heroku のダッシュボード上に表示される app 名と違う場合、修正を行ってから、もう一度 git push します

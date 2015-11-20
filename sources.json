@@ -28,5 +28,19 @@
 			, "title"    : "CM3D2 MOD ろだC"
 			, "filename" : "cm3d2_c.rss"
 		}
+		, {
+			  "url"      : "http://ux.getuploader.com/cm3d2_d/"
+			, "type"     : "ux.getuploader.com"
+			, "timezone" : "+09:00"
+			, "title"    : "CM3D2 MOD ろだD"
+			, "filename" : "cm3d2_d.rss"
+		}
+		, {
+			  "url"      : "http://ux.getuploader.com/cm3d2_e/"
+			, "type"     : "ux.getuploader.com"
+			, "timezone" : "+09:00"
+			, "title"    : "CM3D2 MOD ろだE"
+			, "filename" : "cm3d2_e.rss"
+		}
 	]
 }]
